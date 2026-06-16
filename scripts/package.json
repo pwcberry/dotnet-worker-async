@@ -1,0 +1,11 @@
+{
+  "name": "brunsnik-simpleworker-scripts",
+  "version": "0.0.0",
+  "description": "Scripts to support the Simple Worker exercise.",
+  "license": "MIT",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

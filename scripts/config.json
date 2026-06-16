@@ -1,0 +1,15 @@
+{
+  "directories": {
+    "input": "~/SimpleWorker/input",
+    "processed": "~/SimpleWorker/processed",
+    "output": "~/SimpleWorker/output"
+  },
+  "settings": {
+    "fileExtension": "txt",
+    "maxDelay": 5000,
+    "maxFilesToGenerate": 10,
+    "minPairs": 5,
+    "maxPairs": 20,
+    "maxInteger": 100
+  }
+}
