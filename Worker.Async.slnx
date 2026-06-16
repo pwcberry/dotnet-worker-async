@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Brunsnik.SimpleWorker.Test/Brunsnik.SimpleWorker.Test.csproj" />
+  <Project Path="Brunsnik.SimpleWorker/Brunsnik.SimpleWorker.csproj" />
+</Solution>
