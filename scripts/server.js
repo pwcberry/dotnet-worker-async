@@ -1,12 +1,12 @@
-import {mkdir, open} from "node:fs/promises";
-import {join} from "node:path";
+import { mkdir, open } from "node:fs/promises";
+import { join } from "node:path";
 import os from "node:os";
 import config from "./config.json" with {type: "json"};
 
 const getRandInt = (max, min = 0) => min + Math.floor(Math.random() * (max - min + 1));
 
 async function checkDirExists(path) {
-    let result = undefined;
+    let result;
 
     try {
         const handle = await open(path);
@@ -28,7 +28,7 @@ async function checkDirExists(path) {
 }
 
 async function makeDir(path) {
-    await mkdir(path, {recursive: true});
+    await mkdir(path, { recursive: true });
 }
 
 async function generateFile(targetPath, extension, pairs) {
@@ -59,7 +59,7 @@ function generatePairs(minPairs, maxPairs, maxInteger) {
 function getRandomDelay(maxDelay, minDelay = 1000) {
     const [max, min] = [Math.floor(maxDelay / 100), Math.floor(minDelay / 100)];
     const d = getRandInt(max, min) * 100;
-    return d > maxDelay ? maxDelay : d;
+    return Math.min(d, maxDelay);
 }
 
 function resolvePath(path) {
@@ -74,13 +74,13 @@ async function main() {
     const pathExists = await checkDirExists(inputPath);
     if (pathExists === false) {
         await makeDir(inputPath);
-    } else if (typeof pathExists === "undefined") {
+    } else if (pathExists === undefined) {
         throw new Error(`The input path configured as "${inputPath}" exists but is not a directory`);
     }
 
     console.log("Target directory:", inputPath);
 
-    const {fileExtension, maxDelay, maxFilesToGenerate, minPairs, maxPairs, maxInteger} = config.settings;
+    const { fileExtension, maxDelay, maxFilesToGenerate, minPairs, maxPairs, maxInteger } = config.settings;
     let counter = 0;
 
     const delay = getRandomDelay(maxDelay);

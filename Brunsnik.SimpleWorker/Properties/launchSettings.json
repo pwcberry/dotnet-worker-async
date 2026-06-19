@@ -1,12 +1,15 @@
-﻿{
-  "$schema": "https://json.schemastore.org/launchsettings.json",
+{
   "profiles": {
     "Brunsnik.SimpleWorker": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development"
-      }
+        "DOTNET_ENVIRONMENT": "Development",
+        "ROOT_DIR": "C:\\Users\\pberry\\Dev\\data\\worker-async",
+        "HOME": "C:\\Users\\pberry"
+      },
+      "dotnetRunMessages": true,
+      "hotReloadEnabled": false
     }
-  }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json"
 }
