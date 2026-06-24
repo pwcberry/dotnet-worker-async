@@ -107,17 +107,16 @@ public class FileProcessor(ILogger<FileProcessor> logger, ProcessorContext conte
 
     private InputFileState CanConvertFile(string fileName)
     {
+        if (File.Exists(Path.Join(context.ProcessedDirectory, fileName)))
+        {
+            logger.LogWarning("Input file was already processed: {FileName}", fileName);
+            return InputFileState.Processed;
+        }
+
         if (!File.Exists(Path.Combine(context.InputDirectory, fileName)))
         {
             logger.LogDebug("Input file not found: {FileName}", fileName);
             return InputFileState.NotFound;
-        }
-
-        var processedFile = new FileInfo(Path.Join(context.ProcessedDirectory, fileName));
-        if (processedFile.Exists)
-        {
-            logger.LogWarning("Input file was already processed: {FileName}", fileName);
-            return InputFileState.Processed;
         }
 
         lock (hashSetLock)
