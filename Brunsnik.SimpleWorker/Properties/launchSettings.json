@@ -4,7 +4,7 @@
       "commandName": "Project",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development",
-        "ROOT_DIR": "C:\\Users\\pberry\\Dev\\data\\worker-async",
+        "ROOT_DIR": "C:\\Users\\pberry\\AsyncWorker",
         "HOME": "C:\\Users\\pberry"
       },
       "dotnetRunMessages": true,

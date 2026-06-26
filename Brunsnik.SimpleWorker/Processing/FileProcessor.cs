@@ -1,7 +1,9 @@
-﻿using Microsoft.Extensions.FileProviders;
+﻿using Brunsnik.SimpleWorker.Conversion;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.FileSystemGlobbing;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 
 namespace Brunsnik.SimpleWorker.Processing;
 
@@ -12,14 +14,8 @@ public class FileProcessor(ILogger<FileProcessor> logger, ProcessorContext conte
     // FileSystemWatcher to monitor the input directory for new files. It raises events when files are created, moved, or deleted.
     private readonly FileSystemWatcher watcher = new(context.InputDirectory);
 
-    // Used as a lock to ensure that only one file is processed at a time, and to prevent multiple threads from processing the same file simultaneously.
-    private readonly SemaphoreSlim semaphore = new(1, 1);
-
-    // Used to track files that are currently being processed, to prevent multiple threads from processing the same file simultaneously.
-    private readonly HashSet<string> filesInProcess = new();
-
-    // Used to synchronize access to the filesInProcess HashSet, since it is not thread-safe.
-    private readonly Lock hashSetLock = new();
+    // SafeFileAccessor to manage concurrent access to files, ensuring that only one thread can read a file at a time.
+    private readonly SafeFileAccessor fileAccessor = new();
 
     // Flag to indicate disposal state of the FileProcessor
     private bool disposed;
@@ -28,7 +24,7 @@ public class FileProcessor(ILogger<FileProcessor> logger, ProcessorContext conte
     {
         logger.LogInformation("Watching input directory: {InputDirectory}", watcher.Path);
 
-        watcher.Filter = $"*.dat";
+        watcher.Filter = $"*{context.InputFileExtension}";
         watcher.EnableRaisingEvents = true;
         watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.CreationTime | NotifyFilters.LastAccess;
         watcher.Created += OnFileCreated;
@@ -38,7 +34,7 @@ public class FileProcessor(ILogger<FileProcessor> logger, ProcessorContext conte
     public async Task ProcessMissedFiles()
     {
         var inputDirectoryInfo = new DirectoryInfo(context.InputDirectory);
-        var inputFiles = inputDirectoryInfo.GetFiles($"*.dat", SearchOption.TopDirectoryOnly);
+        var inputFiles = inputDirectoryInfo.GetFiles($"*{context.InputFileExtension}", SearchOption.TopDirectoryOnly);
 
         logger.LogInformation("Reviewing files in the input directory: {InputDirectory}", context.InputDirectory);
 
@@ -56,53 +52,41 @@ public class FileProcessor(ILogger<FileProcessor> logger, ProcessorContext conte
     private async Task ConvertFile(string filePath, string status)
     {
         var fileName = Path.GetFileName(filePath);
-        logger.LogInformation("{STATUS}: Begin conversion of: '{Path}'", status, filePath);
+        logger.LogInformation("{STATUS}: Begin conversion of: '{FileName}'", status, fileName);
 
-        lock (hashSetLock)
+        using var stream = await fileAccessor.ReadAsync(filePath, CancellationToken.None);
+        var parser = new Parser();
+        var document = parser.Parse(stream);
+        stream.Close();
+
+        if (document is not null)
         {
-            if (!filesInProcess.Contains(fileName))
-            {
-                filesInProcess.Add(fileName);
-            }
+            logger.LogDebug("Converted input file: {FileName}", fileName);
+            WriteDocumentToOutput(document, filePath);
         }
 
-        await semaphore.WaitAsync();
-        logger.LogInformation("{STATUS}: Semaphore acquired", status);
-
-        if (File.Exists(filePath))
+        if (!context.IsRetainable)
         {
-            logger.LogInformation("{STATUS}: File exists: {FileName}", status, fileName);
-
-            try
-            {
-                await ConvertInputFile(filePath, status);
-
-                var processedFilePath = Path.Combine(context.ProcessedDirectory, fileName);
-                File.Move(filePath, processedFilePath, overwrite: true);
-                logger.LogInformation("{STATUS}: Moved original file to processed directory: {FileName}", status, fileName);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "{STATUS}: Error processing file: {FileName}\nError: {Message}", status, Path.GetFileName(filePath), ex.Message);
-            }
-            finally
-            {
-                semaphore.Release();
-                logger.LogInformation("{STATUS}: Semaphore released", status);
-            }
+            MoveInputFileToProcessedDirectory(filePath);
         }
+
+        logger.LogInformation("{STATUS}: End conversion of: '{FileName}'", status, fileName);
     }
 
-    private async Task ConvertInputFile(string inputFilePath, string status)
+    private void WriteDocumentToOutput(XDocument document, string inputFilePath)
     {
-        var fileName = Path.GetFileName(inputFilePath);
-        logger.LogInformation("{STATUS}: Begin converting file   : {FileName}", status, fileName);
+        var outputFileName = Path.GetFileNameWithoutExtension(inputFilePath) + ".xml";
+        var outputFilePath = Path.Combine(context.OutputDirectory, outputFileName);
+        logger.LogInformation("Writing converted document to: {OutputFilename}", outputFileName);
+        document.Save(outputFilePath);
+    }
 
-        await Task.Delay(TimeSpan.FromSeconds(5));
-
-        var outputFilePath = Path.Combine(context.OutputDirectory, fileName);
-        File.Copy(inputFilePath, outputFilePath, overwrite: true);
-        logger.LogInformation("{STATUS}: Finished converting file: {FileName}", status, fileName);
+    private void MoveInputFileToProcessedDirectory(string inputFilePath)
+    {
+        var inputFileName = Path.GetFileName(inputFilePath);
+        var processedFilePath = Path.Combine(context.ProcessedDirectory, inputFileName);
+        logger.LogInformation("Moving input file to processed directory: {FileName}", inputFileName);
+        File.Move(inputFilePath, processedFilePath, true);
     }
 
     private InputFileState CanConvertFile(string fileName)
@@ -113,19 +97,17 @@ public class FileProcessor(ILogger<FileProcessor> logger, ProcessorContext conte
             return InputFileState.Processed;
         }
 
-        if (!File.Exists(Path.Combine(context.InputDirectory, fileName)))
+        var fullPath = Path.Combine(context.InputDirectory, fileName);
+        if (!File.Exists(fullPath))
         {
             logger.LogDebug("Input file not found: {FileName}", fileName);
             return InputFileState.NotFound;
         }
 
-        lock (hashSetLock)
+        if (fileAccessor.HasLock(fullPath))
         {
-            if (filesInProcess.Contains(fileName))
-            {
-                logger.LogWarning("Input file is already being processed: {FileName}", fileName);
-                return InputFileState.InProcess;
-            }
+            logger.LogWarning("Input file is already being processed: {FileName}", fileName);
+            return InputFileState.InProcess;
         }
 
         return InputFileState.Ready;
@@ -156,7 +138,7 @@ public class FileProcessor(ILogger<FileProcessor> logger, ProcessorContext conte
             watcher.Created -= OnFileCreated;
             watcher.Deleted -= OnFileDeleted;
             watcher.Dispose();
-            semaphore.Dispose();
+            fileAccessor.Dispose();
             disposed = true;
         }
 

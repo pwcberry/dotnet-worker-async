@@ -43,6 +43,12 @@ public sealed class SafeFileAccessor : IDisposable
         }
     }
 
+    public bool HasLock(string filePath)
+    {
+        var key = Path.GetFullPath(filePath);
+        return fileLocks.TryGetValue(key, out var semaphore) && semaphore.CurrentCount == 0;
+    }
+
     public void Dispose()
     {
         if (!disposed)
