@@ -1,8 +1,8 @@
 {
   "directories": {
-    "input": "~/SimpleWorker/input",
-    "processed": "~/SimpleWorker/processed",
-    "output": "~/SimpleWorker/output"
+    "input": "~/AsyncWorker/input",
+    "processed": "~/AsyncWorker/processed",
+    "output": "~/AsyncWorker/output"
   },
   "settings": {
     "fileExtension": "txt",

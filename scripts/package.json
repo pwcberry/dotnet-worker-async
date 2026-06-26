@@ -1,11 +1,12 @@
 {
-  "name": "brunsnik-simpleworker-scripts",
+  "name": "dotnet-worker-async-scripts",
   "version": "0.0.0",
-  "description": "Scripts to support the Simple Worker exercise.",
+  "description": "Scripts to support the .NET Async Worker exercise.",
   "license": "MIT",
   "type": "module",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   }
 }
